@@ -96,5 +96,15 @@
     "prisma": "^6.10.1",
     "tailwindcss": "^4.1.11",
     "typescript": "^5.8.3"
-  }
+  },
+  "trustedDependencies": [
+    "@prisma/client",
+    "@prisma/engines",
+    "@tailwindcss/oxide",
+    "bcrypt",
+    "core-js",
+    "prisma",
+    "sharp",
+    "unrs-resolver"
+  ]
 }

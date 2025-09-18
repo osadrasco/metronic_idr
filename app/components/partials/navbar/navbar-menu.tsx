@@ -49,7 +49,7 @@ const NavbarMenu = ({ items }: { items: MenuConfig }) => {
       } else {
         return (
           <MenubarMenu key={index}>
-            <MenubarTrigger
+            {/* <MenubarTrigger
               asChild
               className={cn(
                 'flex items-center px-2 py-3.5 text-sm text-secondary-foreground px-3',
@@ -66,7 +66,7 @@ const NavbarMenu = ({ items }: { items: MenuConfig }) => {
               >
                 {item.title}
               </Link>
-            </MenubarTrigger>
+            </MenubarTrigger> */}
           </MenubarMenu>
         );
       }
