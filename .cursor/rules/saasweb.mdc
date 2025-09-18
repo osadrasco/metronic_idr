@@ -1,0 +1,275 @@
+---
+description: >
+  Full Technical Rules for Metronic + Next.js (App Router).
+  Senior-level checklist and execution flow to guarantee maximum quality.
+  Always run a Global Technical Audit before coding.
+  All code must be in English (EN i18n namespace only).
+globs:
+  - "**/*.tsx"
+  - "**/*.ts"
+  - "**/*.json"
+  - "**/*.md"
+  - "**/*.mjs"
+  - "**/*.cjs"
+  - "**/*.yml"
+  - "**/*.yaml"
+  - "**/*.prisma"
+  - "**/*.sql"
+  - ".env"
+  - ".env.example"
+  - "prisma/**"
+  - "docker-compose.yml"
+  - "Dockerfile"
+  - "scripts/**"
+  - "vitest.config.ts"
+  - "vitest.setup.ts"
+
+alwaysApply: true
+---
+
+[GOAL]
+Work as a senior engineer inside a Metronic + Next.js (App Router) + Tailwind v4 + ReUI project.  
+Always run a **Global Technical Audit** before implementing anything.  
+Never break the demo.  
+Never hardcode strings.  
+Deliver all code in English (EN namespace only).  
+Ensure every output is at the quality level of a senior engineer.
+
+[GLOBAL TECHNICAL AUDIT CHECKLIST]
+For each item: (A) check if it exists, (B) verify correctness, (C) improve to senior-level quality.
+
+1) Project Scaffolding & Configuration
+- Next.js App Router present; no legacy /pages.
+- TypeScript strict (no implicit any, prefer noUncheckedIndexAccess).
+- Tailwind v4 configured; PostCSS works; class ordering sane.
+- Path aliases (e.g. "@/") in tsconfig and used consistently.
+- ESLint (flat) + Prettier + import/order; all clean.
+- Build runs clean: lint, typecheck, build without warnings.
+
+- Ensure `vitest.config.ts` exists and is correctly configured:
+  - test environment set to "jsdom"
+  - coverage provider "v8"
+  - reporters ["text", "html"]
+  - reportsDirectory "./coverage"
+  - coverage thresholds ≥80% (lines, functions, branches, statements)
+  - excludes node_modules, dist, .next, *.d.ts, mocks, and test helpers
+
+- Enforce a single package manager (npm | pnpm | yarn) and do not switch lockfiles.
+- Ensure Prettier and Tailwind configs are present and consistent across the repo.
+
+
+2) Global Layout & Providers
+- Root layout composes Metronic correctly (header/sidebar/containers).
+- Providers: theme, query client, i18n, etc. colocated correctly.
+- Metadata configured at route level and global defaults set.
+- No misuse of providers in Server Components.
+
+3) ERROR, LOADING & RESILIENCE SURFACES — COMPREHENSIVE
+Goal: deterministic, accessible and consistent UX for all common failure modes.
+
+A Global pages & boundaries
+- Global 404: `app/not-found.tsx` styled with Metronic; explain and offer clear navigation back.
+- Global 500: `app/error.tsx` with reset boundary; do NOT show raw stack; include support link/log id hook if available.
+- Segment-level boundaries: every async/IO-heavy route should consider local `error.tsx` + `loading.tsx` with consistent skeletons.
+
+B Standard UI states (must exist everywhere relevant)
+- `LoadingState` (skeleton/spinner + aria-busy).
+- `EmptyState` (clear, non-accusatory copy + primary action).
+- `ErrorState` (maps status/error codes to friendly messages and actions).
+
+C Error taxonomy (normalize and handle)
+At the data layer (apiClient), normalize errors to `{ status, code, message, retryAfter?, details? }`.
+Map at least the following:
+- 400 Bad Request → show validation messages (field-level if from Zod/server).
+- 401 Unauthorized → if route requires auth, **redirect to sign-in** or show action (“Sign in to continue”).
+- 403 Forbidden → show “no permission” message + optional “Request access” action; do NOT suggest retry.
+- 404 Not Found → show not-found pattern; offer “Go back” or “Create new” if list context.
+- 408 Request Timeout / client-abort → show retry with backoff; keep context.
+- 409 Conflict → suggest refresh or reconcile; show diff if applicable.
+- 410 Gone → treat as not-found with extra context.
+- 422 Unprocessable Entity → surface field errors from schema; keep user inputs.
+- 425/426/428 (precondition/upgrade) → rare; show generic error with support CTA.
+- 429 Too Many Requests (rate limit) → respect `Retry-After`; show countdown; disable actions until allowed.
+- 500 Internal Server Error → generic apology; `Try again` + non-intrusive logging.
+- 502/503/504 Upstream/maintenance → show service-down message; **auto-retry** with jitter; status banner allowed.
+
+D Network/Runtime conditions
+- Offline detection (`navigator.onLine`, fetch error “TypeError: Failed to fetch”): show “You’re offline” banner/state; auto-retry when back online.
+- AbortController: allow user-cancel for long requests; present graceful cancel state.
+- Progressive enhancement: optimistic UI only when safe to roll back.
+- Global connectivity banner reflecting online/offline state; automatically attempt a silent retry once the connection is restored.
+
+
+E UX & a11y rules
+- Messages in **English only** (i18n keys), concise, constructive, without leaking technical jargon.
+- Buttons: primary = recovery (Retry/Sign in), secondary = back/cancel; tertiary = details/logs if relevant.
+- Focus management: on error, move focus to the error heading; use `role="alert"` where appropriate.
+- No infinite spinners; show timeouts and recovery paths.
+- Respect `Retry-After`; avoid hammering servers.
+
+F Testing
+- For each data view and form, cover: loading → success → empty → 4xx (422 with field errors) → 5xx → 429 → offline/timeout.
+- Snapshot of error/empty components ok; but prioritize interaction tests (retry, focus, a11y roles).
+
+4) Theming, Design Tokens & ReUI Compliance
+- Always use ReUI/Metronic tokens/components.
+- No raw CSS dumps; Tailwind + tokens only.
+- Layout uses Metronic card/grid system.
+
+5) Internationalization
+- i18n enabled, but **English only** for now.
+- All user-facing strings via translation keys.
+- Organized namespaces per feature.
+- No hardcoded strings.
+
+6) Reusable UI Primitives
+- DataTable.metronic.tsx (ReUI + TanStack Table; pagination, sort, empty/error).
+- FormField.metronic.tsx (RHF + ReUI inputs; labels, aria, inline errors).
+- LoadingState.tsx, EmptyState.tsx, ErrorState.tsx consistent design.
+- SectionHeader.tsx (title + description + actions).
+- All features must reuse these primitives.
+
+7) Data & Networking
+- TanStack Query configured globally with QueryClientProvider.
+- Deterministic query keys; sensible staleTime, retry; non-intrusive error toasts.
+- lib/apiClient.ts exists; normalizes errors; can route to /api mocks.
+- app/api/* routes serve mocks from mocks/* with 200/400/404/500 cases.
+- Mocks generic (items/records), domain-agnostic.
+- Use AbortController for all requests and cancel in-flight requests on route changes to avoid state updates on unmounted components.
+
+
+8) Forms & Validation
+- React Hook Form + Zod for all forms.
+- Types inferred from schemas; no untyped payloads.
+- Submit states: disabled, loading spinner, top-level error, reset on success.
+- Accessible FormField wrappers (label/description/id/aria-invalid).
+
+9) Accessibility (A11y)
+- All interactive elements keyboard accessible.
+- Focus rings visible; no outline: none.
+- Color contrast meets AA.
+- Icons never alone for meaning; text/aria provided.
+- Proper heading hierarchy and roles.
+
+10) Performance & Code Health
+- Prefer RSC; only mark "use client" when required.
+- Use dynamic() for client-only libs (charts, editors, maps).
+- next/image for media with correct sizing.
+- Memoization only when measured/justified.
+- No heavy dependencies without bundle analysis.
+- Use Next.js caching directives intentionally: `force-cache`/`revalidate` for static or periodically fresh data, and `no-store` for per-user or highly dynamic data.
+
+
+11) Testing & QA
+- Vitest + Testing Library must be globally configured.
+- A `vitest.config.ts` file must exist with:
+  - environment set to "jsdom"
+  - coverage provider "v8"
+  - reporters ["text", "html"]
+  - reportsDirectory "./coverage"
+  - coverage thresholds ≥80% (lines, functions, branches, statements)
+  - sensible exclude patterns (node_modules, dist, .next, d.ts, mocks, tests)
+- New tests must cover: loading → success → error → empty states, form validation, key interactions.
+- Always target ≥80% coverage.
+- Coverage report is mandatory:
+  - Run:
+    ```bash
+    vitest run --coverage
+    ```
+    after implementing tests.
+  - HTML report must be generated automatically at `./coverage/index.html`.
+  - The Cursor must instruct to open the HTML file in the browser to inspect coverage.
+- If coverage falls below the threshold, add more tests until reaching it or provide a clear technical justification.
+
+12) Developer Experience & Repo Hygiene
+- NPM scripts: dev, build, start, lint, typecheck, test, test:coverage, format.
+- **test:coverage** must execute:
+  ```bash
+  vitest run --coverage --reporter=html --reporter=text
+- CI/CD pipeline must run: lint, typecheck, build, test, and generate/publish the coverage HTML artifact at ./coverage/index.html.
+
+- Conventional Commits enforced; PRs describe changes, include UI screenshots if relevant, and test steps.
+
+- .env.example must exist and remain up to date (no secrets).
+
+13) Documentation
+- Each feature includes docs/<feature>.md:
+  - File tree
+  - Props/contracts (Zod/types)
+  - How to run/test
+  - A11y and performance notes
+- Complex hooks/utilities include JSDoc.
+
+[DB SETUP & OPS — SAFE MODE]
+- Use Prisma with a local DB for development. Prefer **Dockerized Postgres** (via Docker Desktop).
+- Fallback: allow SQLite (dev-only) if Postgres is unavailable.
+- Never commit secrets. Always edit `.env.example` (template) and `.env` (local dev).
+- Ensure `.gitignore` includes `.env` so local secrets are never committed.
+- Validate DATABASE_URL before running Prisma commands.
+
+[Local Postgres via Docker Compose]
+- If `docker-compose.yml` does not exist, create one with a `postgres:16` service:
+  - POSTGRES_USER=app, POSTGRES_PASSWORD=app, POSTGRES_DB=app
+  - Expose 5432 on localhost; add healthcheck.
+- Add NPM scripts:
+  - "db:up": "docker compose up -d db"
+  - "db:down": "docker compose down"
+  - "db:reset": "prisma migrate reset --force"
+  - "db:push": "prisma db push"
+  - "db:migrate": "prisma migrate dev"
+  - "db:seed": "ts-node prisma/seed.ts || node prisma/seed.js"
+- `.env.example` and `.env` must include:
+  DATABASE_URL="postgresql://app:app@localhost:5432/app?schema=public"
+  DIRECT_URL="postgresql://app:app@localhost:5432/app?schema=public"
+  NEXTAUTH_URL="http://localhost:3000"
+  NEXTAUTH_SECRET="changeme-in-dev"
+
+[SQLite Fallback (dev-only)]
+- If Postgres is not available, allow:
+  DATABASE_URL="file:./dev.db"
+- Clearly document that SQLite is only for local dev; never use in staging/prod.
+
+[Prisma Workflow]
+- After setting `.env`, run `npm run db:push` (or `db:migrate` if migrations exist), then `db:seed`.
+- Keep prisma/schema.prisma aligned with Next-Auth tables and app models.
+- Seed file must always create, at minimum:
+  - one fake admin user compatible with Next-Auth (credentials or email, as required by the demo)
+  - a session or a clear path to authenticate in development
+  - optional: minimal sample data to exercise list/empty/error states safely
+
+[Auth & Email Dev]
+- For email-based flows, prefer dev transports (mailcatcher/ethereal). Never commit real credentials.
+
+[CI Safety]
+- CI must not run a real DB unless explicitly configured. Skip DB steps unless CI_DB=true.
+- Provide docs: docs/dev-database.md with setup steps, commands, seed instructions, troubleshooting.
+
+[Command Execution Policy]
+- If dependency install issues occur, allow --legacy-peer-deps.
+- After any install, always run: npm run typecheck && npm run lint && npm run test.
+
+[Failure Modes]
+- If Prisma fails due to missing env or network, fall back to SQLite dev mode and continue,
+  but output a clear TODO with steps to enable Postgres properly.
+
+[EXECUTION MODE]
+- On ANY request:
+  1) Run the Global Technical Audit (summarize gaps).
+  2) Fix baseline issues first (non-breaking).
+  3) Build requested feature/page/component.
+  4) Deliverables:
+     - Audit summary
+     - File tree diff
+     - Per-file diffs
+     - Short justifications (RSC vs client, query keys, A11y/Perf decisions)
+     - Vitest coverage results (summary and path to HTML report ./coverage/index.html)
+     - Validation that vitest.config.ts exists with proper coverage configuration
+  5) Ensure lint/typecheck/build/tests all pass.
+
+[RESTRICTIONS]
+- Do NOT directly modify Metronic/ReUI core files.
+- Use wrappers/overrides in components/ui/*.
+- No implicit any; no broad eslint-disable.
+- No hardcoded strings in JSX; all via EN i18n.
+- No /pages legacy folder; App Router only.
+- Do not break the Metronic demo.
